@@ -1,57 +1,71 @@
-import pandas as pd
-from gensim.models import Word2Vec
+from sklearn.model_selection import train_test_split
 
-from Dataset import MELD_TRAIN_TEXT_PATH, MELD_DEV_TEXT_PATH, MELD_TEST_TEXT_PATH
-from Dataset.utils import preprocess_text, word_averaging_list
-from sklearn.preprocessing import LabelEncoder
+from Dataset.models.Sample import Sample
+from Dataset.utils import constants as dataset_constants
+from Dataset.utils.io_utils import save_pickle
+from Dataset.utils import utils as dataset_utils
+from sentence_transformers import SentenceTransformer
 
-vector_size = 300
-window = 5
-min_count = 1
-epochs = 300
+
+model = SentenceTransformer("paraphrase-distilroberta-base-v1")
+
+
+def get_meld():
+    df = dataset_utils.load_dataset(dataset_constants.DATASET_PATH, dataset_constants.AUDIO_DIR)
+    samples = []
+
+    prev_end = None
+    prev_dialogue_id = None
+
+    for _, row in df.iterrows():
+        if prev_dialogue_id != row["dialogue_id"]:
+            prev_dialogue_id = row["dialogue_id"]
+            prev_end = None
+
+        text = dataset_utils.clean_text(row["utterance"], remove_stopwords=False)
+        embedding = dataset_utils.extract_embeddings(sentence=text, model=model)
+        audio, sr = dataset_utils.load_audio_segment(
+            row["path_to_audio"],
+            row["start"],
+            row["end"]
+        )
+
+        audio = dataset_utils.normalize_audio(audio)
+        mfcc = dataset_utils.extract_mfcc(audio, sr)
+
+        sample = Sample(
+            text=text,
+            audio_path=row["path_to_audio"],
+            label=row["emotion"],
+            dialogue_id=row["dialogue_id"],
+            speaker_id=row["Speaker"],
+            start=row["start"],
+            end=row["end"],
+            prev_end=prev_end,
+            embeddings=embedding,
+            mfcc=mfcc
+        )
+
+        samples.append(sample)
+        prev_end = row["end"]
+
+    temp, test = train_test_split(
+        samples,
+        test_size=dataset_constants.TEST_SIZE,
+        random_state=dataset_constants.RANDOM_STATE
+    )
+
+    dev_size_relative = dataset_constants.DEV_SIZE / (1 - dataset_constants.TEST_SIZE)
+    train, dev = train_test_split(
+        temp,
+        test_size=dev_size_relative,
+        random_state=dataset_constants.RANDOM_STATE
+    )
+
+    return train, dev, test
 
 
 if __name__ == '__main__':
-    pd.set_option('display.max_columns', None)
-
-    df_train = pd.read_csv(MELD_TRAIN_TEXT_PATH)
-    df_dev = pd.read_csv(MELD_DEV_TEXT_PATH)
-    df_test = pd.read_csv(MELD_TEST_TEXT_PATH)
-
-    print(df_train.shape) # (9989, 11)
-    print(df_dev.shape) # (1109, 11)
-    print(df_test.shape) # (2610, 11)
-
-    df_train['preprocessed_text'] = df_train['Utterance'].apply(preprocess_text)
-    df_dev['preprocessed_text'] = df_train['Utterance'].apply(preprocess_text)
-    df_test['preprocessed_text'] = df_train['Utterance'].apply(preprocess_text)
-
-    label_encoder = LabelEncoder()
-    df_train['encoded_emotions'] = label_encoder.fit_transform(df_train.Emotion)
-    df_dev['encoded_emotions'] = label_encoder.fit_transform(df_dev.Emotion)
-    df_test['encoded_emotions'] = label_encoder.fit_transform(df_test.Emotion)
-
-    # Преобразование токенов (строка → список)
-    train_tokens = df_train["preprocessed_text"].tolist()
-    dev_tokens = df_dev["preprocessed_text"].tolist()
-    test_tokens = df_test["preprocessed_text"].tolist()
-
-    #  Обучение Word2Vec
-    all_tokens = train_tokens + dev_tokens + test_tokens
-    w2v_model = Word2Vec(sentences=all_tokens, vector_size=vector_size, window=window, min_count=min_count)
-    w2v_model.build_vocab(all_tokens, update=True)
-    w2v_model.train(all_tokens, total_examples=w2v_model.corpus_count, epochs=epochs)
-
-    #  Усреднение векторов
-    X_train = word_averaging_list(w2v_model.wv, train_tokens)
-    X_dev = word_averaging_list(w2v_model.wv, dev_tokens)
-    X_test = word_averaging_list(w2v_model.wv, test_tokens)
-
-    df_train['vector'] = X_train.tolist()
-    df_dev['vector'] = X_dev.tolist()
-    df_test['vector'] = X_test.tolist()
-
-    # Сохраняем результаты векторизации
-    df_train.to_csv(f"meld/vector_train.csv", index=False)
-    df_dev.to_csv(f"meld/vector_dev.csv", index=False)
-    df_test.to_csv(f"meld/vector_test.csv", index=False)
+    train, dev, test = get_meld()
+    data = {"train": train, "dev": dev, "test": test}
+    save_pickle(data, f"{dataset_constants.SAMPLES_PATH}")
