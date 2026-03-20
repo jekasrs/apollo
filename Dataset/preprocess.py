@@ -65,7 +65,11 @@ def get_meld():
     return train, dev, test
 
 
-if __name__ == '__main__':
+def main():
     train, dev, test = get_meld()
     data = {"train": train, "dev": dev, "test": test}
     save_pickle(data, f"{dataset_constants.SAMPLES_PATH}")
+
+
+if __name__ == '__main__':
+    main()
