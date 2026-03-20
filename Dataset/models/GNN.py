@@ -1,21 +1,15 @@
+"""Графовая нейронная сеть, которая обрабатывает граф:
+Граф состоит из:
+    1. nodes(узлы) - основная информация о реплике
+    2. edges(ребра) - связь между узлами
+    3. типы связей (relations) - кто кому говорит
+        - Например, ответ влияет иначе чем вопрос
+"""
 from torch import nn
 from torch_geometric.nn import RGCNConv, TransformerConv
 
+
 class GNN(nn.Module):
-    """Графовая нейронная сеть, которая обрабатывает граф:
-
-    Граф состоит из:
-        1. nodes(узлы) - основная информация о реплике
-        2. edges(ребра) - связь между узлами
-        3. типы связей (relations) - кто кому говорит
-            - Например, ответ влияет иначе чем вопрос
-
-    Алгоритм обучения:
-        RGCN - учитывает тип связей
-        Transformer - выбирает самые важные связи (attention между узлами)
-        BatchNorm - Нормализация
-        LeakyReLU - Активация
-    """
     def __init__(self, g_dim, h1_dim, h2_dim, n_speakers, gnn_n_heads):
         """
         Инициализация
@@ -37,7 +31,6 @@ class GNN(nn.Module):
         :param node_features: Признаки узлов
         :param edge_index: Список ребер
         :param edge_type: Тип для каждого ребра
-        :return:
         """
         x = self.conv1(node_features, edge_index, edge_type)
         x = self.conv2(x, edge_index)

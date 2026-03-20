@@ -1,8 +1,4 @@
-from pathlib import Path
-# пути
-DATASET_PATH = Path("meld/meld.csv")
-AUDIO_DIR = Path("/Users/evsmirnovalek/PycharmProjects/apollo/Dataset/meld/audio")
-SAMPLES_PATH = Path("models/samples.pkl")
+# Констатнты для дата-сетов
 
 # аудио настройки
 SAMPLE_RATE = 16000

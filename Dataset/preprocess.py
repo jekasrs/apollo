@@ -1,5 +1,6 @@
 from sklearn.model_selection import train_test_split
 
+from Dataset import DATASET_PATH, AUDIO_DIR, SAMPLES_PATH
 from Dataset.models.Sample import Sample
 from Dataset.utils import constants as dataset_constants
 from Dataset.utils.io_utils import save_pickle
@@ -11,7 +12,7 @@ model = SentenceTransformer("paraphrase-distilroberta-base-v1")
 
 
 def get_meld():
-    df = dataset_utils.load_dataset(dataset_constants.DATASET_PATH, dataset_constants.AUDIO_DIR)
+    df = dataset_utils.load_dataset(DATASET_PATH, AUDIO_DIR)
     samples = []
 
     prev_end = None
@@ -24,11 +25,7 @@ def get_meld():
 
         text = dataset_utils.clean_text(row["utterance"], remove_stopwords=False)
         embedding = dataset_utils.extract_embeddings(sentence=text, model=model)
-        audio, sr = dataset_utils.load_audio_segment(
-            row["path_to_audio"],
-            row["start"],
-            row["end"]
-        )
+        audio, sr = dataset_utils.load_audio_segment(row["path_to_audio"])
 
         audio = dataset_utils.normalize_audio(audio)
         mfcc = dataset_utils.extract_mfcc(audio, sr)
@@ -68,7 +65,7 @@ def get_meld():
 def main():
     train, dev, test = get_meld()
     data = {"train": train, "dev": dev, "test": test}
-    save_pickle(data, f"{dataset_constants.SAMPLES_PATH}")
+    save_pickle(data, f"{SAMPLES_PATH}")
 
 
 if __name__ == '__main__':

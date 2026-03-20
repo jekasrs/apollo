@@ -1,18 +1,18 @@
+"""
+Рекуррентная сеть учитывает порядок и помнит контекст из LSTM.
+Каждая реплика должна понимать, что было до и после неё.
+"""
 from torch import nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
 class SeqContext(nn.Module):
-    """
-    Рекуррентная сеть учитывает порядок и помнит контекст из LSTM.
-    Каждая реплика должна понимать, что было до и после неё.
-    """
     def __init__(self, dataset_embedding_dims, hc_dim, drop_rate, seq_context_n_layer, device):
         """
 
-        :param dataset_embedding_dims: размер входных данных (вектор 768 BERT)
+        :param dataset_embedding_dims: размер входных данных
         :param hc_dim: Размер скрытого состояния слоя
-        :param drop_rate:
+        :param drop_rate: Параметр для борьбы с переобучением
         :param seq_context_n_layer: кол-во слоев LSTM
         :param device:
         """
