@@ -12,11 +12,8 @@ lemmatizer = WordNetLemmatizer()
 stop_words = {}
 
 
-def load_audio_segment(path, start, end, sr=16000):
+def load_audio_segment(path, sr=16000):
     y, sr = librosa.load(path, sr=sr)
-    start_sample = int(start * sr)
-    end_sample = int(end * sr)
-    # segment = y[start_sample:end_sample]
     return y, sr
 
 
