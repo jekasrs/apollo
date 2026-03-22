@@ -8,7 +8,6 @@ class Classifier(nn.Module):
 
     def __init__(self, input_dim, hidden_size, num_classes, drop_rate, class_weights):
         """
-
         :param input_dim: Размер входного вектора
         :param hidden_size: Размер скрытого слоя
         :param num_classes: Кол-во классов

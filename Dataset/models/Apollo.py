@@ -104,7 +104,7 @@ class Apollo(nn.Module):
             rep_features.append(combined.mean(dim=0))  # усредняем по токенам
             start += length
 
-        rep_features = torch.stack(rep_features)  # [B, feat_dim]
+        rep_features = torch.stack(rep_features)
 
         # классификация
         out = self.classifier(rep_features)

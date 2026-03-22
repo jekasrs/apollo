@@ -6,10 +6,10 @@ import time
 
 import numpy as np
 import torch
-from sklearn import metrics
 from tqdm import tqdm
 
 from Dataset.utils.constants import EMOTION_MAP
+from eval import evaluate_dataset
 
 
 class Coach:
@@ -98,53 +98,21 @@ class Coach:
         return epoch_loss
 
     def evaluate(self, test=False):
-        dev_loss = 0
         dataset = self.test_set if test else self.dev_set
-        self.model.eval()
-        with torch.no_grad():
-            golds = []
-            preds = []
-            for idx in tqdm(range(len(dataset)), desc="test" if test else "dev"):
-                data = dataset[idx]
-                golds.append(data["label_tensor"])
-                for k, v in data.items():
-                    if not k == "utterance_texts":
-                        data[k] = v.to(self.device)
-                y_hat = self.model(data)
-                preds.append(y_hat.detach().to("cpu"))
-                nll = self.model.get_loss(data)
-                dev_loss += nll.item()
+        desc = "test" if test else "dev"
+        out = evaluate_dataset(
+            self.model,
+            dataset,
+            self.device,
+            self.label_to_idx,
+            desc=desc,
+            print_report=test,
+        )
+        if test and self.experiment is not None:
+            self.experiment.log_metric("accuracy score", out["accuracy"])
+            for name, score in out["per_class_f1"].items():
+                self.experiment.log_metric(f"f1_{name}", score)
 
-            golds = torch.cat(golds, dim=0).numpy()
-            logits = torch.cat(preds, dim=0).numpy()
-            pred_labels = np.argmax(logits, axis=1)
-            f1 = metrics.f1_score(golds, pred_labels, average="weighted")
-
-            if test:
-                print(
-                    metrics.classification_report(
-                        golds,
-                        pred_labels,
-                        target_names=list(self.label_to_idx.keys()),
-                        digits=4,
-                        zero_division=0,
-                    )
-                )
-
-                per_class = metrics.f1_score(
-                    golds,
-                    pred_labels,
-                    average=None,
-                    labels=np.arange(len(self.label_to_idx)),
-                    zero_division=0,
-                )
-                f1 = dict(zip(self.label_to_idx.keys(), per_class))
-
-                if self.experiment is not None:
-                    self.experiment.log_metric(
-                        "accuracy score", metrics.accuracy_score(golds, pred_labels)
-                    )
-                    for name, score in f1.items():
-                        self.experiment.log_metric(f"f1_{name}", score)
-
-        return f1, dev_loss
+        if test:
+            return out["per_class_f1"], out["mean_loss"] * len(dataset)
+        return out["weighted_f1"], out["mean_loss"] * len(dataset)

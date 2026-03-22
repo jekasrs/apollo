@@ -1,20 +1,22 @@
 import torch
 
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-4
 MAX_GRAD_VALUE = 1.0
-WEIGHT_DECAY = 1e-4
+WEIGHT_DECAY = 1e-5
 
 # Set False for full-quality training (slower). True = fast sanity check.
-SMOKE_TEST = False
+SMOKE_TEST = True
+
+MODALITIES = "at"
 
 if SMOKE_TEST:
-    BATCH_SIZE = 64
-    EPOCHS = 50
+    BATCH_SIZE = 32
+    EPOCHS = 10
     TRAIN_MAX_SAMPLES = None
-    DEV_MAX_SAMPLES = 512
-    TEST_MAX_SAMPLES = 512
+    DEV_MAX_SAMPLES = None
+    TEST_MAX_SAMPLES = None
     RUN_TEST_EACH_EPOCH = False
-    GNN_SPEAKER_BUCKETS = 8
+    GNN_SPEAKER_BUCKETS = 32
 else:
     BATCH_SIZE = 8
     EPOCHS = 50
