@@ -6,7 +6,7 @@ import numpy as np
 from nltk.stem import WordNetLemmatizer
 from pathlib import Path
 
-from Dataset.utils.constants import EMOTION_MAP
+from Dataset.utils.constants import EMOTION_MAP, SPEAKER_MAP
 
 lemmatizer = WordNetLemmatizer()
 stop_words = {}
@@ -28,6 +28,7 @@ def load_dataset(csv_path, audio_dir):
 
     df = df.rename(columns={
         "Utterance": "utterance",
+        "Speaker": "speaker",
         "Dialogue_ID": "dialogue_id",
         "Utterance_ID": "utterance_id",
         "Season": "season",
@@ -41,6 +42,7 @@ def load_dataset(csv_path, audio_dir):
 
     # Замена текстовых эмоций на числовые
     df["emotion"] = df["emotion"].map(EMOTION_MAP)
+    df["speaker"] = df["speaker"].map(SPEAKER_MAP)
 
     return df
 

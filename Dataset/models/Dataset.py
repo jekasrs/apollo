@@ -35,23 +35,22 @@ class Dataset:
         utterances = []
         for i, s in enumerate(samples):
             cur_len = len(s.text)
-            utterances.append(s.sentence)
+            utterances.append(s.text)
             tmp = []
-            for t, a in zip(s.sbert_sentence_embeddings, s.audio):
-                t = torch.tensor(t)
-                a = torch.tensor(a)
-                if self.modalities == "at":
-                    tmp.append(torch.cat((a, t)))
-                elif self.modalities == "a":
-                    tmp.append(a)
-                elif self.modalities == "t":
-                    tmp.append(t)
+            t = torch.tensor(s.embeddings)
+            a = torch.tensor(s.mfcc)
+            if self.modalities == "at":
+                tmp.append(torch.cat((a, t)))
+            elif self.modalities == "a":
+                tmp.append(a)
+            elif self.modalities == "t":
+                tmp.append(t)
 
             tmp = torch.stack(tmp)
             input_tensor[i, :cur_len, :] = tmp
-            speaker_tensor[i, :cur_len] = torch.tensor([s.speaker])
+            speaker_tensor[i, :cur_len] = torch.tensor([s.speaker_id])
 
-            labels.extend(s.label)
+            labels.append(s.label)
 
         label_tensor = torch.tensor(labels).long()
         data = {

@@ -35,7 +35,7 @@ def get_meld():
             audio_path=row["path_to_audio"],
             label=row["emotion"],
             dialogue_id=row["dialogue_id"],
-            speaker_id=row["Speaker"],
+            speaker_id=row["speaker"],
             start=row["start"],
             end=row["end"],
             prev_end=prev_end,
