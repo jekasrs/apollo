@@ -208,3 +208,5 @@ __marimo__/
 
 .idea
 Dataset/meld
+
+.DS_Store
