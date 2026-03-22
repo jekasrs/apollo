@@ -7,6 +7,7 @@ from Dataset.models.Apollo import Apollo
 from Dataset.models.Coach import Coach
 from Dataset.models.Dataset import Dataset
 from Dataset.models.Optim import Optim
+from Dataset.models.class_weights import compute_class_weights_from_samples
 from Dataset.models.constants import (
     BATCH_SIZE,
     DEVICE,
@@ -53,9 +54,12 @@ def main():
     logging.log(logging.INFO, f"A dev array len={len(dev_set)}")
     logging.log(logging.INFO, f"A test array len={len(test_set)}")
 
+    class_weights = compute_class_weights_from_samples(train_samples, len(EMOTION_MAP), DEVICE)
+    logging.info("Class weights (balanced): %s", dict(zip(EMOTION_MAP.keys(), class_weights.tolist())))
+
     # Создаем модель
     logging.log(logging.INFO, "Started creating Apollo model")
-    model = Apollo( modalities="at", device=DEVICE)
+    model = Apollo(modalities="at", device=DEVICE, class_weights=class_weights)
     model.to(DEVICE)
 
     # Создаем оптимизатор, получаем scheduler
@@ -91,6 +95,7 @@ def main():
         "train_losses": train_losses,
         "dev_f1s": dev_f1s,
         "test_f1s": test_f1s,
+        "class_weights": class_weights.detach().cpu(),
         "model_args": None
     }
 

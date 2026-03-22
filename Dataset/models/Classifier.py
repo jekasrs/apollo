@@ -19,13 +19,15 @@ class Classifier(nn.Module):
         self.hidden_size = hidden_size
         self.num_classes = num_classes
         self.drop_rate = drop_rate
-        self.class_weights = class_weights
 
         self.lin1 = nn.Linear(input_dim, hidden_size)
         self.drop = nn.Dropout(drop_rate)
         self.lin2 = nn.Linear(hidden_size, num_classes)
 
-        self.ce_loss = nn.CrossEntropyLoss(weight=self.class_weights)
+        if class_weights is not None:
+            self.register_buffer("ce_class_weights", class_weights.float())
+        else:
+            self.ce_class_weights = None
 
     def forward(self, h):
         hidden = F.relu(self.lin1(h))
@@ -40,8 +42,8 @@ class Classifier(nn.Module):
 
     def get_loss(self, h, label_tensor):
         scores = self.forward(h)
-        loss = self.ce_loss(scores, label_tensor)
-        return loss
+        w = self.ce_class_weights
+        return F.cross_entropy(scores, label_tensor, weight=w)
 
     def predict(self, h):
         scores = self.forward(h)

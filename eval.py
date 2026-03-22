@@ -87,21 +87,24 @@ def _load_checkpoint_weights(model: Apollo, path: Path, map_location) -> dict:
     ckpt = torch.load(path, map_location=map_location, weights_only=False)
     meta = {k: v for k, v in ckpt.items() if k != "best_state" and k != "state_dict"}
     if "best_state" in ckpt:
-        model.load_state_dict(ckpt["best_state"])
+        model.load_state_dict(ckpt["best_state"], strict=False)
         return meta
     if "state_dict" in ckpt:
         inner = ckpt["state_dict"]
         if isinstance(inner, torch.nn.Module):
-            model.load_state_dict(inner.state_dict())
+            model.load_state_dict(inner.state_dict(), strict=False)
         else:
-            model.load_state_dict(inner)
+            model.load_state_dict(inner, strict=False)
         return meta
-    model.load_state_dict(ckpt)
+    model.load_state_dict(ckpt, strict=False)
     return {}
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate Apollo on MELD dev/test")
+    ckpt = torch.load(Path("checkpoints/model.pt"), map_location=DEVICE, weights_only=False)
+    cw = ckpt.get("class_weights")
+    if cw is not None:
+        cw = cw.to(DEVICE)
 
     data = load_pickle(Path("Dataset") / SAMPLES_PATH)
     samples = data["test"]
@@ -116,7 +119,7 @@ def main():
         dataset_embedding_dims=DIMS[MODALITIES],
     )
 
-    model = Apollo(modalities=MODALITIES, device=DEVICE)
+    model = Apollo(modalities=MODALITIES, device=DEVICE, class_weights=cw)
     model.to(DEVICE)
 
     meta = _load_checkpoint_weights(model, Path("checkpoints/model.pt"), map_location=DEVICE)

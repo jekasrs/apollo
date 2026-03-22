@@ -9,7 +9,7 @@ from Dataset.utils.constants import EMOTION_MAP, DIMS, SPEAKER_MAP
 
 
 class Apollo(nn.Module):
-    def __init__(self, modalities, device):
+    def __init__(self, modalities, device, class_weights=None):
         super(Apollo, self).__init__()
         self.modalities = modalities
         u_dim = DIMS[modalities]   # Размерность входных features utterances
@@ -49,8 +49,9 @@ class Apollo(nn.Module):
             classifier_input_dim = h2_dim * self.gnn_n_heads
 
         # Classifier определяет к какому классу относится реплика
-        self.classifier = Classifier(classifier_input_dim, hc_dim, len(EMOTION_MAP), drop_rate=0.3, class_weights=None)
-
+        self.classifier = Classifier(
+            classifier_input_dim, hc_dim, len(EMOTION_MAP), drop_rate=0.3, class_weights=class_weights
+        )
         # Словарь для типов ребер графа
         self.edge_type_to_idx = self._create_edge_type_mapping(self.n_speakers_gnn)
 
