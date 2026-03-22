@@ -13,18 +13,19 @@ from Dataset.utils.constants import EMOTION_MAP
 
 
 class Coach:
-    def __init__(self, train, dev, test, model, opt, sched, epochs, device, label_to_idx):
+    def __init__(self, train, dev, test, model, optimizer, scheduler, epochs, device, label_to_idx, run_test_each_epoch=True):
         self.experiment = None
         self.train_set = train
         self.dev_set = dev
         self.test_set = test
         self.model = model
-        self.opt = opt
-        self.scheduler = sched
+        self.optimizer = optimizer
+        self.scheduler = scheduler
         self.epochs = epochs
         self.device = device
         self.label_to_idx = label_to_idx
         self.label_dict = EMOTION_MAP
+        self.run_test_each_epoch = run_test_each_epoch
 
         # early stopping
         self.best_dev_f1 = None # лучший результат
@@ -49,8 +50,12 @@ class Coach:
             dev_f1, dev_loss = self.evaluate()   # 2 - валидация
 
             self.scheduler.step(dev_loss) # 3 - регуляризация lr
-            test_f1, _ = self.evaluate(test=True) # 4 - тестирование
-            test_f1 = np.array(list(test_f1.values())).mean() # 5 - усреднение f1, так как f1 отдельно по каждому классу
+            if self.run_test_each_epoch:
+                test_f1, _ = self.evaluate(test=True) # 4 - тестирование
+                test_f1 = np.array(list(test_f1.values())).mean() # 5 - усреднение f1, так как f1 отдельно по каждому классу
+                test_f1s.append(test_f1)
+            else:
+                test_f1 = float("nan")
 
             if best_dev_f1 is None or dev_f1 > best_dev_f1: # 6 - если модель стала лучше, то запоминаем веса
                 best_dev_f1 = dev_f1
@@ -62,8 +67,12 @@ class Coach:
                 )
 
             dev_f1s.append(dev_f1)
-            test_f1s.append(test_f1)
             train_losses.append(train_loss)
+
+        if not self.run_test_each_epoch:
+            test_f1, _ = self.evaluate(test=True)
+            test_f1 = np.array(list(test_f1.values())).mean()
+            test_f1s.append(test_f1)
 
         return best_dev_f1, best_epoch, best_state, train_losses, dev_f1s, test_f1s
 
@@ -83,7 +92,7 @@ class Coach:
             nll = self.model.get_loss(data)
             epoch_loss += nll.item()
             nll.backward()
-            self.opt.step()
+            self.optimizer.step()
 
         end_time = time.time()
         return epoch_loss
@@ -107,50 +116,35 @@ class Coach:
                 dev_loss += nll.item()
 
             golds = torch.cat(golds, dim=0).numpy()
-            preds = torch.cat(preds, dim=0).numpy()
-            f1 = metrics.f1_score(golds, preds, average="weighted")
+            logits = torch.cat(preds, dim=0).numpy()
+            pred_labels = np.argmax(logits, axis=1)
+            f1 = metrics.f1_score(golds, pred_labels, average="weighted")
 
             if test:
                 print(
                     metrics.classification_report(
-                        golds, preds, target_names=self.label_to_idx.keys(), digits=4
+                        golds,
+                        pred_labels,
+                        target_names=list(self.label_to_idx.keys()),
+                        digits=4,
+                        zero_division=0,
                     )
                 )
 
-                happy = metrics.f1_score(
-                    golds[:, 0], preds[:, 0], average="weighted"
+                per_class = metrics.f1_score(
+                    golds,
+                    pred_labels,
+                    average=None,
+                    labels=np.arange(len(self.label_to_idx)),
+                    zero_division=0,
                 )
-                sad = metrics.f1_score(golds[:, 1], preds[:, 1], average="weighted")
-                anger = metrics.f1_score(
-                    golds[:, 2], preds[:, 2], average="weighted"
-                )
-                surprise = metrics.f1_score(
-                    golds[:, 3], preds[:, 3], average="weighted"
-                )
-                disgust = metrics.f1_score(
-                    golds[:, 4], preds[:, 4], average="weighted"
-                )
-                fear = metrics.f1_score(
-                    golds[:, 5], preds[:, 5], average="weighted"
-                )
+                f1 = dict(zip(self.label_to_idx.keys(), per_class))
 
-                f1 = {
-                    "happy": happy,
-                    "sad": sad,
-                    "anger": anger,
-                    "surprise": surprise,
-                    "disgust": disgust,
-                    "fear": fear,
-                }
-
-                self.experiment.log_metric(
-                    "accuracy score", metrics.accuracy_score(golds, preds)
-                )
-                self.experiment.log_metric("happiness_f1", happy)
-                self.experiment.log_metric("sadness_f1", sad)
-                self.experiment.log_metric("anger_f1", anger)
-                self.experiment.log_metric("surprise_f1", surprise)
-                self.experiment.log_metric("disgust_f1", disgust)
-                self.experiment.log_metric("fear_f1", fear)
+                if self.experiment is not None:
+                    self.experiment.log_metric(
+                        "accuracy score", metrics.accuracy_score(golds, pred_labels)
+                    )
+                    for name, score in f1.items():
+                        self.experiment.log_metric(f"f1_{name}", score)
 
         return f1, dev_loss

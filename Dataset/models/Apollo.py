@@ -4,6 +4,7 @@ from Dataset.models.Classifier import Classifier
 from Dataset.models.GNN import GNN
 from Dataset.models.SeqContext import SeqContext
 from Dataset.models.functions import batch_graphify
+from Dataset.models.constants import GNN_SPEAKER_BUCKETS
 from Dataset.utils.constants import EMOTION_MAP, DIMS, SPEAKER_MAP
 
 
@@ -25,7 +26,11 @@ class Apollo(nn.Module):
         self.wp = 10  # Окно прошлого (window past)
         self.wf = 10  # Окно будущего (window future)
         self.gnn_n_heads = 2  # Количество голов attention в GNN
-        self.n_speakers = len(self.dataset_speaker_dict) # Количество уникальных speakers
+        # RGCN relation count is 2 * n^2; optional bucketing (see constants.SMOKE_TEST).
+        self.n_speakers_gnn = (
+            GNN_SPEAKER_BUCKETS if GNN_SPEAKER_BUCKETS is not None else len(self.dataset_speaker_dict)
+        )
+        self._bucket_speakers = GNN_SPEAKER_BUCKETS is not None
 
         # SeqContext контекстуализация реплик(utterances), чтобы каждая реплика понимала, что было до и после неё.
         self.rnn = SeqContext(
@@ -37,7 +42,7 @@ class Apollo(nn.Module):
         )
 
         # GNN распознает связи между репликами (+1 измерение 'сложности' модели)
-        self.gnn = GNN(g_dim, h1_dim, h2_dim, self.n_speakers, self.gnn_n_heads)
+        self.gnn = GNN(g_dim, h1_dim, h2_dim, self.n_speakers_gnn, self.gnn_n_heads)
         if self.concat_gin_gout:
             classifier_input_dim = g_dim + h2_dim * self.gnn_n_heads
         else:
@@ -47,7 +52,7 @@ class Apollo(nn.Module):
         self.classifier = Classifier(classifier_input_dim, hc_dim, len(EMOTION_MAP), drop_rate=0.3, class_weights=None)
 
         # Словарь для типов ребер графа
-        self.edge_type_to_idx = self._create_edge_type_mapping(self.n_speakers)
+        self.edge_type_to_idx = self._create_edge_type_mapping(self.n_speakers_gnn)
 
     def _create_edge_type_mapping(self, n_speakers):
         """Создает mapping типов ребер для графа (tuple: speaker1, speaker2, direction)"""
@@ -73,7 +78,8 @@ class Apollo(nn.Module):
             self.wp,
             self.wf,
             self.edge_type_to_idx,
-            self.device
+            self.device,
+            n_speaker_buckets=self.n_speakers_gnn if self._bucket_speakers else None,
         )
         # Обработка графа через GNN
         graph_out = self.gnn(features, edge_index, edge_type)
@@ -121,6 +127,6 @@ class Apollo(nn.Module):
             rep_features.append(combined.mean(dim=0))
             start += length
 
-        rep_features = torch.stack(rep_features)  # [B, feat_dim]
+        rep_features = torch.stack(rep_features)
         loss = self.classifier.get_loss(rep_features, data["label_tensor"])
         return loss

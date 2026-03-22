@@ -43,6 +43,7 @@ def load_dataset(csv_path, audio_dir):
     # Замена текстовых эмоций на числовые
     df["emotion"] = df["emotion"].map(EMOTION_MAP)
     df["speaker"] = df["speaker"].map(SPEAKER_MAP)
+    df = df.dropna(subset=["emotion", "speaker"])
 
     return df
 
@@ -79,9 +80,16 @@ def extract_embeddings(sentence, model):
     return model.encode(sentence)
 
 
-def time_to_seconds(time: str):
-    """Преобразует 'HH:MM:SS,mmm' в секунды."""
-    time_str = time.replace(",", ".")
-    h, m, s = map(float, re.split("[:.]", time_str)[:3])
-    ms = float("0." + time_str.split(".")[-1])
-    return h * 3600 + m * 60 + s + ms
+def time_to_seconds(time) -> float:
+    """Convert MELD-style timestamps ('HH:MM:SS,mmm' or 'HH:MM:SS') to seconds."""
+    if pd.isna(time):
+        return float("nan")
+    time_str = str(time).strip().replace(",", ".")
+    parts = re.split(r"[:.]", time_str)
+    if len(parts) == 4:
+        h, m, s_int, frac = parts
+        return float(h) * 3600 + float(m) * 60 + float(s_int) + float(f"0.{frac}")
+    if len(parts) == 3:
+        h, m, s = map(float, parts)
+        return h * 3600 + m * 60 + s
+    raise ValueError(f"Unrecognized time format: {time!r}")

@@ -26,29 +26,27 @@ class Dataset:
 
     def padding(self, samples):
         batch_size = len(samples)
-        text_len_tensor = torch.tensor([len(s.text) for s in samples]).long()
-        mx = torch.max(text_len_tensor).item()
-
-        input_tensor = torch.zeros((batch_size, mx, self.embedding_dim))
-        speaker_tensor = torch.zeros((batch_size, mx)).long()
+        # One timestep per sample: each Sample is a single utterance with one embedding (+ MFCC).
+        text_len_tensor = torch.ones(batch_size, dtype=torch.long)
+        input_tensor = torch.zeros((batch_size, 1, self.embedding_dim))
+        speaker_tensor = torch.zeros((batch_size, 1), dtype=torch.long)
         labels = []
-        utterances = []
+        utterance_texts = []
         for i, s in enumerate(samples):
-            cur_len = len(s.text)
-            utterances.append(s.text)
-            tmp = []
-            t = torch.tensor(s.embeddings)
-            a = torch.tensor(s.mfcc)
+            utterance_texts.append(s.text)
+            t = torch.as_tensor(s.embeddings, dtype=torch.float32)
+            a = torch.as_tensor(s.mfcc, dtype=torch.float32)
             if self.modalities == "at":
-                tmp.append(torch.cat((a, t)))
+                feat = torch.cat((a, t))
             elif self.modalities == "a":
-                tmp.append(a)
+                feat = a
             elif self.modalities == "t":
-                tmp.append(t)
+                feat = t
+            else:
+                raise ValueError(f"Unknown modalities: {self.modalities}")
 
-            tmp = torch.stack(tmp)
-            input_tensor[i, :cur_len, :] = tmp
-            speaker_tensor[i, :cur_len] = torch.tensor([s.speaker_id])
+            input_tensor[i, 0, :] = feat
+            speaker_tensor[i, 0] = int(s.speaker_id)
 
             labels.append(s.label)
 
@@ -58,7 +56,7 @@ class Dataset:
             "input_tensor": input_tensor,
             "speaker_tensor": speaker_tensor,
             "label_tensor": label_tensor,
-            "utterance_texts": utterances,
+            "utterance_texts": utterance_texts,
         }
         return data
 
