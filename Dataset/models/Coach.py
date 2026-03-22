@@ -13,7 +13,7 @@ from Dataset.utils.constants import EMOTION_MAP
 
 
 class Coach:
-    def __init__(self, train, dev, test, model, opt, sched, epochs, device, label_to_idx, emotion):
+    def __init__(self, train, dev, test, model, opt, sched, epochs, device, label_to_idx):
         self.experiment = None
         self.train_set = train
         self.dev_set = dev
@@ -25,7 +25,6 @@ class Coach:
         self.device = device
         self.label_to_idx = label_to_idx
         self.label_dict = EMOTION_MAP
-        self.emotion = emotion
 
         # early stopping
         self.best_dev_f1 = None # лучший результат
