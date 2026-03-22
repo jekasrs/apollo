@@ -57,7 +57,7 @@ def main():
         "model_args": None
     }
 
-    model_file = "./model_checkpoints/model.pt"
+    model_file = "./checkpoints/model.pt"
     torch.save(checkpoint, model_file)
 
 if __name__ == '__main__':
