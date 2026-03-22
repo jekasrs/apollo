@@ -6,7 +6,6 @@ Usage (from project root):
   python eval.py --checkpoint checkpoints/model.pt --split test
   python eval.py --max-samples 256
 """
-import argparse
 import logging
 from pathlib import Path
 

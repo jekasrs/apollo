@@ -19,7 +19,7 @@ from Dataset.models.constants import (
     SMOKE_TEST,
     TEST_MAX_SAMPLES,
     TRAIN_MAX_SAMPLES,
-    WEIGHT_DECAY,
+    WEIGHT_DECAY, MODALITIES,
 )
 from Dataset.utils.constants import EMOTION_MAP, DIMS
 from Dataset.utils.io_utils import load_pickle
@@ -46,9 +46,9 @@ def main():
             "(set SMOKE_TEST=False in Dataset/models/constants.py for full training)"
         )
 
-    train_set = Dataset(train_samples, batch_size=BATCH_SIZE, modalities="at", dataset_embedding_dims=DIMS["at"])
-    dev_set = Dataset(dev_samples, batch_size=BATCH_SIZE, modalities="at", dataset_embedding_dims=DIMS["at"])
-    test_set = Dataset(test_samples, batch_size=BATCH_SIZE, modalities="at", dataset_embedding_dims=DIMS["at"])
+    train_set = Dataset(train_samples, batch_size=BATCH_SIZE, modalities=MODALITIES, dataset_embedding_dims=DIMS[MODALITIES])
+    dev_set = Dataset(dev_samples, batch_size=BATCH_SIZE, modalities=MODALITIES, dataset_embedding_dims=DIMS[MODALITIES])
+    test_set = Dataset(test_samples, batch_size=BATCH_SIZE, modalities=MODALITIES, dataset_embedding_dims=DIMS[MODALITIES])
 
     logging.log(logging.INFO, f"A train array len={len(train_set)}")
     logging.log(logging.INFO, f"A dev array len={len(dev_set)}")
@@ -59,7 +59,7 @@ def main():
 
     # Создаем модель
     logging.log(logging.INFO, "Started creating Apollo model")
-    model = Apollo(modalities="at", device=DEVICE, class_weights=class_weights)
+    model = Apollo(modalities=MODALITIES, device=DEVICE, class_weights=class_weights)
     model.to(DEVICE)
 
     # Создаем оптимизатор, получаем scheduler

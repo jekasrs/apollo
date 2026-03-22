@@ -7,7 +7,7 @@ WEIGHT_DECAY = 1e-5
 # Set False for full-quality training (slower). True = fast sanity check.
 SMOKE_TEST = True
 
-MODALITIES = "at"
+MODALITIES = "t"
 
 if SMOKE_TEST:
     BATCH_SIZE = 32
@@ -16,7 +16,7 @@ if SMOKE_TEST:
     DEV_MAX_SAMPLES = None
     TEST_MAX_SAMPLES = None
     RUN_TEST_EACH_EPOCH = False
-    GNN_SPEAKER_BUCKETS = 32
+    GNN_SPEAKER_BUCKETS = 16
 else:
     BATCH_SIZE = 8
     EPOCHS = 50

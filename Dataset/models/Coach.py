@@ -77,7 +77,6 @@ class Coach:
         return best_dev_f1, best_epoch, best_state, train_losses, dev_f1s, test_f1s
 
     def train_epoch(self, epoch):
-        start_time = time.time()
         epoch_loss = 0
         self.model.train()
 
@@ -94,7 +93,6 @@ class Coach:
             nll.backward()
             self.optimizer.step()
 
-        end_time = time.time()
         return epoch_loss
 
     def evaluate(self, test=False):
