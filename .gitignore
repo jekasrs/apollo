@@ -208,5 +208,6 @@ __marimo__/
 
 .idea
 Dataset/meld
+checkpoints/
 
 .DS_Store
