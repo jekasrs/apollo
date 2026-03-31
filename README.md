@@ -16,4 +16,8 @@
 - Dev датасет - 110 диалога (3499 реплик)
 - Test датасет - 88 диалога (2811 реплик)
 
+My model_v2.pt
 ![experements.png](imgs/experements.png)
+
+My model_v3.pt
+![experements.png](imgs/experements_2.png)
