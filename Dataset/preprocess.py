@@ -2,16 +2,18 @@ from collections import defaultdict
 from pathlib import Path
 
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 from Dataset import DATASET_PATH, AUDIO_DIR
 from Dataset.models.Sample import Sample
 from Dataset.utils import constants as dataset_constants
 from Dataset.utils.io_utils import save_pickle
 from Dataset.utils import utils as dataset_utils
+from Dataset.utils.wav2vec_features import Wav2VecEmbedder
 from sentence_transformers import SentenceTransformer
 
 
-model = SentenceTransformer("paraphrase-distilroberta-base-v1")
+text_model = SentenceTransformer("paraphrase-distilroberta-base-v1")
 
 
 def _split_samples_by_dialogue(samples, test_size, dev_size, random_state):
@@ -42,36 +44,67 @@ def get_meld():
     df = dataset_utils.load_dataset(DATASET_PATH, AUDIO_DIR)
     samples = []
 
+    embedder = Wav2VecEmbedder(
+        dataset_constants.WAV2VEC_MODEL_NAME,
+    )
+    batch_size = dataset_constants.WAV2VEC_BATCH_SIZE
+
     prev_end = None
     prev_dialogue_id = None
+    pending = []
 
-    for _, row in df.iterrows():
+    def flush():
+        nonlocal pending
+        if not pending:
+            return
+        feats = embedder.encode_batch([p["audio"] for p in pending])
+        for p, audio_feat in zip(pending, feats):
+            samples.append(
+                Sample(
+                    text=p["text"],
+                    audio_path=p["audio_path"],
+                    label=p["label"],
+                    dialogue_id=p["dialogue_id"],
+                    speaker_id=p["speaker"],
+                    start=p["start"],
+                    end=p["end"],
+                    prev_end=p["prev_end"],
+                    embeddings=p["embeddings"],
+                    audio_features=audio_feat,
+                )
+            )
+        pending = []
+
+    for _, row in tqdm(df.iterrows(), total=len(df), desc="MELD preprocess"):
         if prev_dialogue_id != row["dialogue_id"]:
             prev_dialogue_id = row["dialogue_id"]
             prev_end = None
 
         text = dataset_utils.clean_text(row["utterance"], remove_stopwords=False)
-        embedding = dataset_utils.extract_embeddings(sentence=text, model=model)
+        embedding = dataset_utils.extract_embeddings(sentence=text, model=text_model)
         audio, sr = dataset_utils.load_audio_segment(row["path_to_audio"])
-
         audio = dataset_utils.normalize_audio(audio)
-        mfcc = dataset_utils.extract_mfcc(audio, sr)
 
-        sample = Sample(
-            text=text,
-            audio_path=row["path_to_audio"],
-            label=row["emotion"],
-            dialogue_id=row["dialogue_id"],
-            speaker_id=row["speaker"],
-            start=row["start"],
-            end=row["end"],
-            prev_end=prev_end,
-            embeddings=embedding,
-            mfcc=mfcc
+        pending.append(
+            {
+                "text": text,
+                "audio_path": row["path_to_audio"],
+                "label": row["emotion"],
+                "dialogue_id": row["dialogue_id"],
+                "speaker": row["speaker"],
+                "start": row["start"],
+                "end": row["end"],
+                "prev_end": prev_end,
+                "embeddings": embedding,
+                "audio": audio,
+            }
         )
-
-        samples.append(sample)
         prev_end = row["end"]
+
+        if len(pending) >= batch_size:
+            flush()
+
+    flush()
 
     return _split_samples_by_dialogue(
         samples,
@@ -88,5 +121,5 @@ def main():
     save_pickle(data, out_path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

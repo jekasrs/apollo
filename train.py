@@ -10,16 +10,23 @@ from Dataset.models.Optim import Optim
 from Dataset.models.class_weights import compute_class_weights_from_samples
 from Dataset.models.constants import (
     BATCH_SIZE,
+    CLASSIFIER_HIDDEN_DIM,
     DEVICE,
     DEV_MAX_SAMPLES,
     EPOCHS,
+    FOCAL_GAMMA,
     LEARNING_RATE,
     MAX_GRAD_VALUE,
+    MODALITY_PROJ_DIM,
     RUN_TEST_EACH_EPOCH,
     SMOKE_TEST,
     TEST_MAX_SAMPLES,
     TRAIN_MAX_SAMPLES,
-    WEIGHT_DECAY, MODALITIES,
+    USE_FOCAL_LOSS,
+    USE_INPUT_LAYERNORM,
+    WEIGHT_DECAY,
+    LABEL_SMOOTHING,
+    MODALITIES,
 )
 from Dataset.utils.constants import EMOTION_MAP, DIMS
 from Dataset.utils.io_utils import load_pickle
@@ -96,7 +103,15 @@ def main():
         "dev_f1s": dev_f1s,
         "test_f1s": test_f1s,
         "class_weights": class_weights.detach().cpu(),
-        "model_args": None
+        "model_args": {
+            "modalities": MODALITIES,
+            "modality_proj_dim": MODALITY_PROJ_DIM,
+            "classifier_hidden_dim": CLASSIFIER_HIDDEN_DIM,
+            "use_input_layernorm": USE_INPUT_LAYERNORM,
+            "use_focal_loss": USE_FOCAL_LOSS,
+            "focal_gamma": FOCAL_GAMMA,
+            "label_smoothing": LABEL_SMOOTHING,
+        },
     }
 
     model_file = "./checkpoints/model.pt"

@@ -4,19 +4,27 @@ from Dataset.models.Classifier import Classifier
 from Dataset.models.GNN import GNN
 from Dataset.models.SeqContext import SeqContext
 from Dataset.models.functions import batch_graphify
-from Dataset.models.constants import GNN_SPEAKER_BUCKETS
-from Dataset.utils.constants import EMOTION_MAP, DIMS, SPEAKER_MAP
+from Dataset.models.constants import (
+    CLASSIFIER_HIDDEN_DIM,
+    FOCAL_GAMMA,
+    GNN_SPEAKER_BUCKETS,
+    LABEL_SMOOTHING,
+    MODALITY_PROJ_DIM,
+    USE_FOCAL_LOSS,
+    USE_INPUT_LAYERNORM,
+)
+from Dataset.utils.constants import AUDIO_FEATURE_DIM, DIMS, EMOTION_MAP, SPEAKER_MAP
 
 
 class Apollo(nn.Module):
     def __init__(self, modalities, device, class_weights=None):
         super(Apollo, self).__init__()
         self.modalities = modalities
-        u_dim = DIMS[modalities]   # Размерность входных features utterances
+        u_dim = DIMS[modalities]   # Размерность входных features utterances (до проекций)
         g_dim = 200   # Размерность выхода RNN
         h1_dim = 150  # Размерность скрытого слоя GNN
         h2_dim = 150  # Размерность выхода GNN
-        hc_dim = 100  # Размерность скрытого слоя классификатора
+        hc_dim = CLASSIFIER_HIDDEN_DIM
         self.dataset_label_dict = EMOTION_MAP
         self.dataset_speaker_dict = SPEAKER_MAP
         self.device = device
@@ -32,9 +40,20 @@ class Apollo(nn.Module):
         )
         self._bucket_speakers = GNN_SPEAKER_BUCKETS is not None
 
+        if modalities == "at":
+            self.audio_proj = nn.Linear(AUDIO_FEATURE_DIM, MODALITY_PROJ_DIM)
+            self.text_proj = nn.Linear(DIMS["t"], MODALITY_PROJ_DIM)
+            rnn_in_dim = 2 * MODALITY_PROJ_DIM
+        else:
+            self.audio_proj = None
+            self.text_proj = None
+            rnn_in_dim = u_dim
+
+        self.input_ln = nn.LayerNorm(rnn_in_dim) if USE_INPUT_LAYERNORM else None
+
         # SeqContext контекстуализация реплик(utterances), чтобы каждая реплика понимала, что было до и после неё.
         self.rnn = SeqContext(
-            dataset_embedding_dims=u_dim,
+            dataset_embedding_dims=rnn_in_dim,
             hc_dim=g_dim,
             drop_rate=0.3,
             seq_context_n_layer=2,
@@ -50,7 +69,14 @@ class Apollo(nn.Module):
 
         # Classifier определяет к какому классу относится реплика
         self.classifier = Classifier(
-            classifier_input_dim, hc_dim, len(EMOTION_MAP), drop_rate=0.3, class_weights=class_weights
+            classifier_input_dim,
+            hc_dim,
+            len(EMOTION_MAP),
+            drop_rate=0.3,
+            class_weights=class_weights,
+            use_focal=USE_FOCAL_LOSS,
+            focal_gamma=FOCAL_GAMMA,
+            label_smoothing=0.0 if USE_FOCAL_LOSS else LABEL_SMOOTHING,
         )
         # Словарь для типов ребер графа
         self.edge_type_to_idx = self._create_edge_type_mapping(self.n_speakers_gnn)
@@ -67,10 +93,20 @@ class Apollo(nn.Module):
                 idx += 1
         return edge_type_to_idx
 
+    def _prepare_input_tensor(self, x):
+        if self.modalities == "at":
+            audio = x[..., :AUDIO_FEATURE_DIM]
+            text = x[..., AUDIO_FEATURE_DIM:]
+            x = torch.cat([self.audio_proj(audio), self.text_proj(text)], dim=-1)
+        if self.input_ln is not None:
+            x = self.input_ln(x)
+        return x
+
     def get_rep(self, data):
         """Получение представлений utterances"""
+        inp = self._prepare_input_tensor(data["input_tensor"])
         # Контекстуализация через RNN
-        node_features = self.rnn(data["text_len_tensor"], data["input_tensor"])
+        node_features = self.rnn(data["text_len_tensor"], inp)
         # Построение графа диалога
         features, edge_index, edge_type, edge_index_lengths = batch_graphify(
             node_features,

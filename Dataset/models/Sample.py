@@ -1,5 +1,17 @@
 class Sample:
-    def __init__(self, text, audio_path, label, dialogue_id, speaker_id, start, end, prev_end, embeddings, mfcc):
+    def __init__(
+        self,
+        text,
+        audio_path,
+        label,
+        dialogue_id,
+        speaker_id,
+        start,
+        end,
+        prev_end,
+        embeddings,
+        audio_features,
+    ):
         self.text = text
         self.audio_path = audio_path
         self.label = label
@@ -9,4 +21,4 @@ class Sample:
         self.end = end
         self.pause = start - prev_end if prev_end else 0
         self.embeddings = embeddings
-        self.mfcc = mfcc
+        self.audio_features = audio_features

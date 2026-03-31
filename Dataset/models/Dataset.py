@@ -3,6 +3,17 @@ import random
 import torch
 
 
+def _sample_audio_vec(sample) -> torch.Tensor:
+    """Новые pickle: audio_features (Wav2Vec2). Старые: mfcc — только если размерность совпадает с моделью."""
+    if hasattr(sample, "audio_features") and sample.audio_features is not None:
+        return torch.as_tensor(sample.audio_features, dtype=torch.float32)
+    if hasattr(sample, "mfcc") and sample.mfcc is not None:
+        return torch.as_tensor(sample.mfcc, dtype=torch.float32)
+    raise AttributeError(
+        "Sample должен содержать audio_features (после preprocess с Wav2Vec2) или устаревшее поле mfcc"
+    )
+
+
 class Dataset:
     def __init__(self, samples, batch_size, modalities, dataset_embedding_dims) -> None:
         self.samples = samples
@@ -26,7 +37,7 @@ class Dataset:
 
     def padding(self, samples):
         batch_size = len(samples)
-        # One timestep per sample: each Sample is a single utterance with one embedding (+ MFCC).
+        # One timestep per sample: текст (BERT/ST) + аудио (Wav2Vec2 pooled).
         text_len_tensor = torch.ones(batch_size, dtype=torch.long)
         input_tensor = torch.zeros((batch_size, 1, self.embedding_dim))
         speaker_tensor = torch.zeros((batch_size, 1), dtype=torch.long)
@@ -35,7 +46,7 @@ class Dataset:
         for i, s in enumerate(samples):
             utterance_texts.append(s.text)
             t = torch.as_tensor(s.embeddings, dtype=torch.float32)
-            a = torch.as_tensor(s.mfcc, dtype=torch.float32)
+            a = _sample_audio_vec(s)
             if self.modalities == "at":
                 feat = torch.cat((a, t))
             elif self.modalities == "a":

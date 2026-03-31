@@ -65,6 +65,7 @@ def normalize_audio(y):
 
 
 def extract_mfcc(y, sr, n_mfcc=13):
+    """Legacy MFCC (не используется в текущем preprocess; оставлено для экспериментов)."""
     mfcc = librosa.feature.mfcc(
         y=y,
         sr=sr,
