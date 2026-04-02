@@ -1,26 +1,81 @@
 import math
 import random
+from collections import defaultdict
+
 import torch
+
+from Dataset.models.functions import BATCH_KEY_UTTERANCE_TEXTS
+from Dataset.utils.constants import PAUSE_FEATURE_DIM
 
 
 def _sample_audio_vec(sample) -> torch.Tensor:
-    """Новые pickle: audio_features (Wav2Vec2). Старые: mfcc — только если размерность совпадает с моделью."""
     if hasattr(sample, "audio_features") and sample.audio_features is not None:
         return torch.as_tensor(sample.audio_features, dtype=torch.float32)
     if hasattr(sample, "mfcc") and sample.mfcc is not None:
         return torch.as_tensor(sample.mfcc, dtype=torch.float32)
     raise AttributeError(
-        "Sample должен содержать audio_features (после preprocess с Wav2Vec2) или устаревшее поле mfcc"
+        "Sample должен содержать audio_features или устаревшее поле mfcc"
     )
 
 
+def _speaker_key(sample) -> str:
+    sn = getattr(sample, "speaker_name", None)
+    if sn is not None and str(sn).strip():
+        return str(sn)
+    sid = getattr(sample, "speaker_id", None)
+    if sid is not None:
+        return f"__legacy_id_{int(sid)}__"
+    return "__unknown__"
+
+
+def _local_speaker_ids(utterances):
+    """Порядок первого появления имени → 0, 1, … внутри диалога."""
+    key_to_local = {}
+    out = []
+    for s in utterances:
+        k = _speaker_key(s)
+        if k not in key_to_local:
+            key_to_local[k] = len(key_to_local)
+        out.append(key_to_local[k])
+    return out
+
+
+def _group_samples_into_dialogues(samples):
+    d = defaultdict(list)
+    for s in samples:
+        d[s.dialogue_id].append(s)
+    groups = []
+    for utts in d.values():
+        utts.sort(key=lambda x: (x.start, x.end))
+        groups.append(utts)
+    return groups
+
+
 class Dataset:
-    def __init__(self, samples, batch_size, modalities, dataset_embedding_dims) -> None:
-        self.samples = samples
-        self.batch_size = batch_size
-        self.num_batches = math.ceil(len(self.samples) / batch_size)
+    """
+    Батчи по диалогам; последний канал входа — нормализованная пауза (log1p + z-score по train).
+    """
+
+    def __init__(
+        self,
+        samples,
+        dialogues_per_batch: int,
+        modalities: str,
+        modality_feature_dim: int,
+        pause_mu: float,
+        pause_std: float,
+        augment: bool = False,
+    ) -> None:
         self.modalities = modalities
-        self.embedding_dim = dataset_embedding_dims
+        self.modality_feature_dim = modality_feature_dim
+        self.embedding_dim = modality_feature_dim + PAUSE_FEATURE_DIM
+        self.pause_mu = float(pause_mu)
+        self.pause_std = float(pause_std) if float(pause_std) > 1e-8 else 1.0
+        self.dialogues_per_batch = max(1, int(dialogues_per_batch))
+        self.augment = augment
+        self._dialogue_groups = _group_samples_into_dialogues(samples)
+        n = len(self._dialogue_groups)
+        self.num_batches = math.ceil(n / self.dialogues_per_batch) if n > 0 else 0
 
     def __len__(self):
         return self.num_batches
@@ -31,45 +86,52 @@ class Dataset:
 
     def raw_batch(self, index):
         assert index < self.num_batches, "batch_idx %d > %d" % (index, self.num_batches)
-        batch = self.samples[index * self.batch_size : (index + 1) * self.batch_size]
+        start = index * self.dialogues_per_batch
+        end = min(start + self.dialogues_per_batch, len(self._dialogue_groups))
+        return self._dialogue_groups[start:end]
 
-        return batch
+    def _norm_pause(self, sample) -> float:
+        lp = math.log1p(max(0.0, float(getattr(sample, "pause", 0.0))))
+        return (lp - self.pause_mu) / self.pause_std
 
-    def padding(self, samples):
-        batch_size = len(samples)
-        # One timestep per sample: текст (BERT/ST) + аудио (Wav2Vec2 pooled).
-        text_len_tensor = torch.ones(batch_size, dtype=torch.long)
-        input_tensor = torch.zeros((batch_size, 1, self.embedding_dim))
-        speaker_tensor = torch.zeros((batch_size, 1), dtype=torch.long)
+    def padding(self, dialogue_batch):
+        d_size = len(dialogue_batch)
+        max_len = max(len(g) for g in dialogue_batch)
+        input_tensor = torch.zeros((d_size, max_len, self.embedding_dim))
+        speaker_tensor = torch.zeros((d_size, max_len), dtype=torch.long)
         labels = []
         utterance_texts = []
-        for i, s in enumerate(samples):
-            utterance_texts.append(s.text)
-            t = torch.as_tensor(s.embeddings, dtype=torch.float32)
-            a = _sample_audio_vec(s)
-            if self.modalities == "at":
-                feat = torch.cat((a, t))
-            elif self.modalities == "a":
-                feat = a
-            elif self.modalities == "t":
-                feat = t
-            else:
-                raise ValueError(f"Unknown modalities: {self.modalities}")
 
-            input_tensor[i, 0, :] = feat
-            speaker_tensor[i, 0] = int(s.speaker_id)
+        for di, g in enumerate(dialogue_batch):
+            locals_ = _local_speaker_ids(g)
+            for j, s in enumerate(g):
+                t = torch.as_tensor(s.embeddings, dtype=torch.float32)
+                a = _sample_audio_vec(s)
+                if self.modalities == "at":
+                    feat = torch.cat((a, t))
+                elif self.modalities == "a":
+                    feat = a
+                elif self.modalities == "t":
+                    feat = t
+                else:
+                    raise ValueError(f"Unknown modalities: {self.modalities}")
+                p = torch.tensor([self._norm_pause(s)], dtype=torch.float32)
+                full = torch.cat([feat, p])
+                input_tensor[di, j, :] = full
+                speaker_tensor[di, j] = locals_[j]
+                labels.append(s.label)
+                utterance_texts.append(s.text)
 
-            labels.append(s.label)
-
-        label_tensor = torch.tensor(labels).long()
+        text_len_tensor = torch.tensor([len(g) for g in dialogue_batch], dtype=torch.long)
+        label_tensor = torch.tensor(labels, dtype=torch.long)
         data = {
             "text_len_tensor": text_len_tensor,
             "input_tensor": input_tensor,
             "speaker_tensor": speaker_tensor,
             "label_tensor": label_tensor,
-            "utterance_texts": utterance_texts,
+            BATCH_KEY_UTTERANCE_TEXTS: utterance_texts,
         }
         return data
 
     def shuffle(self):
-        random.shuffle(self.samples)
+        random.shuffle(self._dialogue_groups)

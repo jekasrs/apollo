@@ -10,10 +10,11 @@ from Dataset.utils import constants as dataset_constants
 from Dataset.utils.io_utils import save_pickle
 from Dataset.utils import utils as dataset_utils
 from Dataset.utils.wav2vec_features import Wav2VecEmbedder
+from Dataset.utils.pause_stats import compute_pause_norm_stats
 from sentence_transformers import SentenceTransformer
 
 
-text_model = SentenceTransformer("paraphrase-distilroberta-base-v1")
+text_model = SentenceTransformer(dataset_constants.SENTENCE_TRANSFORMER_MODEL)
 
 
 def _split_samples_by_dialogue(samples, test_size, dev_size, random_state):
@@ -65,12 +66,12 @@ def get_meld():
                     audio_path=p["audio_path"],
                     label=p["label"],
                     dialogue_id=p["dialogue_id"],
-                    speaker_id=p["speaker"],
                     start=p["start"],
                     end=p["end"],
                     prev_end=p["prev_end"],
                     embeddings=p["embeddings"],
                     audio_features=audio_feat,
+                    speaker_name=str(p["speaker"]),
                 )
             )
         pending = []
@@ -116,6 +117,11 @@ def get_meld():
 
 def main():
     train, dev, test = get_meld()
+    pause_mu, pause_std = compute_pause_norm_stats(train)
+    pm, ps = float(pause_mu), float(pause_std)
+    for s in train + dev + test:
+        s.pause_norm_mu = pm
+        s.pause_norm_std = ps
     data = {"train": train, "dev": dev, "test": test}
     out_path = Path(__file__).resolve().parent / "meld" / "samples.pkl"
     save_pickle(data, out_path)

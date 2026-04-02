@@ -3,8 +3,6 @@ Evaluate a trained Apollo checkpoint on dev or test split.
 
 Usage (from project root):
   python eval.py
-  python eval.py --checkpoint checkpoints/model.pt --split test
-  python eval.py --max-samples 256
 """
 import logging
 from pathlib import Path
@@ -17,18 +15,16 @@ from tqdm import tqdm
 from Dataset import SAMPLES_PATH
 from Dataset.models.Apollo import Apollo
 from Dataset.models.Dataset import Dataset
-from Dataset.models.constants import DEVICE, BATCH_SIZE, TEST_MAX_SAMPLES, MODALITIES
+from Dataset.models.constants import DEVICE, DIALOGUES_PER_BATCH, MODALITIES
 from Dataset.utils.constants import DIMS, EMOTION_MAP
+from Dataset.models.functions import batch_to_device
 from Dataset.utils.io_utils import load_pickle
+from Dataset.utils.pause_stats import compute_pause_norm_stats
 
 logging.basicConfig(level=logging.INFO)
 
 
 def evaluate_dataset(model, dataset, device, label_to_idx, desc="eval", print_report=False):
-    """
-    Run the model on all batches of a Dataset and return metrics.
-    Used by training and by eval.py.
-    """
     model.eval()
     total_loss = 0.0
     golds = []
@@ -37,9 +33,7 @@ def evaluate_dataset(model, dataset, device, label_to_idx, desc="eval", print_re
         for idx in tqdm(range(len(dataset)), desc=desc):
             data = dataset[idx]
             golds.append(data["label_tensor"])
-            for k, v in data.items():
-                if k != "utterance_texts":
-                    data[k] = v.to(device)
+            batch_to_device(data, device)
             y_hat = model(data)
             preds.append(y_hat.detach().cpu())
             total_loss += model.get_loss(data).item()
@@ -82,7 +76,6 @@ def evaluate_dataset(model, dataset, device, label_to_idx, desc="eval", print_re
 
 
 def _load_checkpoint_weights(model: Apollo, path: Path, map_location) -> dict:
-    """Load weights from train.py checkpoint or legacy saves. Returns extra metadata dict."""
     ckpt = torch.load(path, map_location=map_location, weights_only=False)
     meta = {k: v for k, v in ckpt.items() if k != "best_state" and k != "state_dict"}
     if "best_state" in ckpt:
@@ -108,14 +101,29 @@ def main():
     data = load_pickle(Path("Dataset") / SAMPLES_PATH)
     samples = data["test"]
 
-    if TEST_MAX_SAMPLES is not None:
-        samples = samples[: TEST_MAX_SAMPLES]
+    s0 = samples[0]
+    mu = getattr(s0, "pause_norm_mu", None)
+    std = getattr(s0, "pause_norm_std", None)
+    if mu is not None and std is not None:
+        pause_mu, pause_std = float(mu), float(std)
+    else:
+        pause_mu, pause_std = compute_pause_norm_stats(data["train"])
+        pause_mu, pause_std = float(pause_mu), float(pause_std)
+        logging.warning(
+            "В pickle нет pause_norm_mu/std — mu/std по train. "
+            "Обновите данные: python Dataset/preprocess.py"
+        )
+    dialogues_per_batch = ckpt.get("dialogues_per_batch", DIALOGUES_PER_BATCH)
+    modality_feature_dim = ckpt.get("modality_feature_dim", DIMS[MODALITIES])
 
     dataset = Dataset(
         samples,
-        batch_size=BATCH_SIZE,
+        dialogues_per_batch=dialogues_per_batch,
         modalities=MODALITIES,
-        dataset_embedding_dims=DIMS[MODALITIES],
+        modality_feature_dim=modality_feature_dim,
+        pause_mu=pause_mu,
+        pause_std=pause_std,
+        augment=False,
     )
 
     model = Apollo(modalities=MODALITIES, device=DEVICE, class_weights=cw)

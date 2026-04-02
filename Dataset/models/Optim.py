@@ -50,10 +50,20 @@ class Optim:
         """
         sched = None
         if sch == "reduceLR":
-            sched = lr_scheduler.ReduceLROnPlateau(self.optimizer, "min")
+            sched = lr_scheduler.ReduceLROnPlateau(
+                self.optimizer,
+                mode="min",
+                factor=0.5,
+                patience=4,
+                min_lr=1e-7,
+            )
         elif sch == "expLR":
             sched = ExponentialLR(self.optimizer, gamma=0.9)
         return sched
+
+    def zero_grad(self):
+        if self.optimizer is not None:
+            self.optimizer.zero_grad(set_to_none=True)
 
     def step(self):
         if self.max_grad_value != -1:

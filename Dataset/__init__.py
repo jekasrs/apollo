@@ -5,4 +5,4 @@ _PKG = Path(__file__).resolve().parent
 DATASET_PATH = _PKG / "meld" / "meld.csv"
 AUDIO_DIR = _PKG / "meld" / "audio"
 # train.py loads: Dataset / SAMPLES_PATH
-SAMPLES_PATH = Path("meld/samples.pkl")
+SAMPLES_PATH = Path("meld/v3/samples.pkl")

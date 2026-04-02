@@ -1,12 +1,11 @@
 import re
 import pandas as pd
 import librosa
-import numpy as np
 
 from nltk.stem import WordNetLemmatizer
 from pathlib import Path
 
-from Dataset.utils.constants import EMOTION_MAP, SPEAKER_MAP
+from Dataset.utils.constants import EMOTION_MAP
 
 lemmatizer = WordNetLemmatizer()
 stop_words = {}
@@ -40,10 +39,9 @@ def load_dataset(csv_path, audio_dir):
     df["start"] = df["start"].apply(time_to_seconds)
     df["end"] = df["end"].apply(time_to_seconds)
 
-    # Замена текстовых эмоций на числовые
     df["emotion"] = df["emotion"].map(EMOTION_MAP)
-    df["speaker"] = df["speaker"].map(SPEAKER_MAP)
-    df = df.dropna(subset=["emotion", "speaker"])
+    df["speaker"] = df["speaker"].astype(str)
+    df = df.dropna(subset=["emotion"])
 
     return df
 
@@ -62,19 +60,6 @@ def clean_text(text: str, remove_stopwords=True):
 
 def normalize_audio(y):
     return librosa.util.normalize(y)
-
-
-def extract_mfcc(y, sr, n_mfcc=13):
-    """Legacy MFCC (не используется в текущем preprocess; оставлено для экспериментов)."""
-    mfcc = librosa.feature.mfcc(
-        y=y,
-        sr=sr,
-        n_mfcc=n_mfcc
-    )
-    mfcc_mean = np.mean(mfcc, axis=1)
-    mfcc_std = np.std(mfcc, axis=1)
-    features = np.concatenate([mfcc_mean, mfcc_std])
-    return features
 
 
 def extract_embeddings(sentence, model):

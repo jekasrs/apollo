@@ -1,7 +1,7 @@
 """Классификатор MLP(Multi-Layer Perceptron)"""
-from torch import nn
-import torch.nn.functional as F
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 
 class Classifier(nn.Module):
@@ -46,7 +46,7 @@ class Classifier(nn.Module):
             self.ce_class_weights = None
 
     def forward(self, h):
-        hidden = F.relu(self.lin1(h))
+        hidden = F.gelu(self.lin1(h))
         hidden = self.drop(hidden)
         scores = self.lin2(hidden)
         return scores
@@ -63,6 +63,7 @@ class Classifier(nn.Module):
         loss = -((1.0 - pt) ** self.focal_gamma) * log_pt
         w = self.ce_class_weights
         if w is not None:
+            w = w / (w.mean() + 1e-8)
             loss = loss * w[target]
         return loss.mean()
 
@@ -71,6 +72,8 @@ class Classifier(nn.Module):
         if self.use_focal:
             return self._focal_loss(scores, label_tensor)
         w = self.ce_class_weights
+        if w is not None:
+            w = w / (w.mean() + 1e-8)
         ls = self.label_smoothing if self.label_smoothing > 0 else 0.0
         return F.cross_entropy(scores, label_tensor, weight=w, label_smoothing=ls)
 

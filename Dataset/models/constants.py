@@ -1,42 +1,40 @@
 import torch
 
-LEARNING_RATE = 1e-4
-MAX_GRAD_VALUE = 1.0
-WEIGHT_DECAY = 1e-5
+MODALITIES = "at"
 
-# Set False for full-quality training (slower). True = fast sanity check.
 SMOKE_TEST = True
-
-MODALITIES = "t"
-
-if SMOKE_TEST:
-    BATCH_SIZE = 32
-    EPOCHS = 10
-    TRAIN_MAX_SAMPLES = None
-    DEV_MAX_SAMPLES = None
-    TEST_MAX_SAMPLES = None
-    RUN_TEST_EACH_EPOCH = False
-    GNN_SPEAKER_BUCKETS = 16
-else:
-    BATCH_SIZE = 16
-    EPOCHS = 50
-    TRAIN_MAX_SAMPLES = None
-    DEV_MAX_SAMPLES = None
-    TEST_MAX_SAMPLES = None
-    RUN_TEST_EACH_EPOCH = True
-    GNN_SPEAKER_BUCKETS = None
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# --- Улучшения для F1 (мультимодальность и дисбаланс классов) ---
-# Для режима "at": отдельные линейные проекции текста и аудио в общее пространство (вместо сырой конкатенации в BiLSTM).
-MODALITY_PROJ_DIM = 256
-# Скрытый слой классификатора (было 100).
-CLASSIFIER_HIDDEN_DIM = 128
-# LayerNorm по признакам перед BiLSTM (стабилизирует масштаб модальностей).
-USE_INPUT_LAYERNORM = True
-# Focal loss для редких эмоций; при True label_smoothing не используется.
+if SMOKE_TEST:
+    DIALOGUES_PER_BATCH = 4
+    EPOCHS = 50
+    RUN_TEST_EACH_EPOCH = False
+else:
+    DIALOGUES_PER_BATCH = 8
+    EPOCHS = 60
+    RUN_TEST_EACH_EPOCH = True
+
+LEARNING_RATE = 2e-4
+MAX_GRAD_VALUE = 1.0
+WEIGHT_DECAY = 1e-4
+CLASS_WEIGHT_BETA = 0.999
+
+# Улучшения для F1 (мультимодальность и дисбаланс классов)
+MODALITY_PROJ_DIM = 320
+CLASSIFIER_HIDDEN_DIM = 192
+RNN_HIDDEN_DIM = 256
+GNN_H1_DIM = 176
+GNN_H2_DIM = 176
+DROPOUT_RNN = 0.25
+DROPOUT_CLASSIFIER = 0.25
+USE_INPUT_LAYER_NORM = True
 USE_FOCAL_LOSS = True
-FOCAL_GAMMA = 2.0
-# Если USE_FOCAL_LOSS = False, можно включить сглаживание меток (0.05).
+FOCAL_GAMMA = 1.5
 LABEL_SMOOTHING = 0.0
+
+# Аугментация (только train, см. Coach)
+USE_TRAIN_AUGMENTATION = True
+AUG_APPLY_PROB = 0.65
+AUG_AUDIO_STD = 0.028
+AUG_TEXT_STD = 0.028

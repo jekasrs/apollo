@@ -2,19 +2,25 @@
 Coach управляет обучением, валидацией, тестированием.
 """
 import copy
-import time
 
 import numpy as np
 import torch
 from tqdm import tqdm
 
-from Dataset.utils.constants import EMOTION_MAP
+from Dataset.models.constants import (
+    AUG_APPLY_PROB,
+    AUG_AUDIO_STD,
+    AUG_TEXT_STD,
+    MODALITIES,
+    USE_TRAIN_AUGMENTATION,
+)
+from Dataset.models.functions import batch_to_device
+from Dataset.utils.augment import maybe_augment_input_tensor
 from eval import evaluate_dataset
 
 
 class Coach:
     def __init__(self, train, dev, test, model, optimizer, scheduler, epochs, device, label_to_idx, run_test_each_epoch=True):
-        self.experiment = None
         self.train_set = train
         self.dev_set = dev
         self.test_set = test
@@ -24,7 +30,6 @@ class Coach:
         self.epochs = epochs
         self.device = device
         self.label_to_idx = label_to_idx
-        self.label_dict = EMOTION_MAP
         self.run_test_each_epoch = run_test_each_epoch
 
         # early stopping
@@ -82,11 +87,18 @@ class Coach:
 
         self.train_set.shuffle()
         for idx in tqdm(range(len(self.train_set)), desc="train epoch {}".format(epoch)):
-            self.model.zero_grad()
+            self.optimizer.zero_grad()
             data = self.train_set[idx]
-            for k, v in data.items():
-                if not k == "utterance_texts":
-                    data[k] = v.to(self.device)
+            batch_to_device(data, self.device)
+
+            if USE_TRAIN_AUGMENTATION and getattr(self.train_set, "augment", False):
+                maybe_augment_input_tensor(
+                    data["input_tensor"],
+                    MODALITIES,
+                    AUG_APPLY_PROB,
+                    AUG_AUDIO_STD,
+                    AUG_TEXT_STD,
+                )
 
             nll = self.model.get_loss(data)
             epoch_loss += nll.item()
@@ -106,11 +118,6 @@ class Coach:
             desc=desc,
             print_report=test,
         )
-        if test and self.experiment is not None:
-            self.experiment.log_metric("accuracy score", out["accuracy"])
-            for name, score in out["per_class_f1"].items():
-                self.experiment.log_metric(f"f1_{name}", score)
-
         if test:
             return out["per_class_f1"], out["mean_loss"] * len(dataset)
         return out["weighted_f1"], out["mean_loss"] * len(dataset)
