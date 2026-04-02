@@ -8,7 +8,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 if SMOKE_TEST:
     DIALOGUES_PER_BATCH = 4
-    EPOCHS = 50
+    EPOCHS = 25
     RUN_TEST_EACH_EPOCH = False
 else:
     DIALOGUES_PER_BATCH = 8

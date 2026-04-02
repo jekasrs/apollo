@@ -21,3 +21,6 @@ My model_v2.pt
 
 My model_v3.pt
 ![experements.png](imgs/experements_2.png)
+
+My model_v4.pt
+![experements.png](imgs/experements_3.png)
