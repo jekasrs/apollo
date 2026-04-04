@@ -1,8 +1,6 @@
 import numpy as np
 import torch
 
-# RGCN: (время вперёд / назад) × (тот же спикер / другой)
-NUM_SEMANTIC_RELATIONS = 4
 
 BATCH_KEY_UTTERANCE_TEXTS = "utterance_texts"
 # Ключи батча, которые не переносятся на GPU

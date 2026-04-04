@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 import torch
 
-from dataset.utils.constants import AUDIO_FEATURE_DIM
+from dataset.preprocess.utils.constants import AUDIO_FEATURE_DIM
 
 
 def augment_content_audio_only(input_tensor: torch.Tensor, std_audio: float) -> None:

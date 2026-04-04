@@ -1,22 +1,20 @@
-"""
-Coach управляет обучением, валидацией, тестированием.
-"""
+"""Coach управляет обучением, валидацией, тестированием."""
 import copy
 
 import numpy as np
 import torch
 from tqdm import tqdm
 
-from Dataset.models.constants import (
+from models.apollo.utils.functions import batch_to_device
+from trainings.eval import evaluate_dataset
+from models.apollo.utils.constants import (
     AUG_APPLY_PROB,
     AUG_AUDIO_STD,
     AUG_TEXT_STD,
     MODALITIES,
     USE_TRAIN_AUGMENTATION,
 )
-from Dataset.models.functions import batch_to_device
-from Dataset.utils.augment import maybe_augment_input_tensor
-from eval import evaluate_dataset
+from dataset.augment.augment import maybe_augment_input_tensor
 
 
 class Coach:
@@ -68,7 +66,7 @@ class Coach:
                 best_state = copy.deepcopy(self.model.state_dict())
                 torch.save( # 7 - сохраняем
                     {"state_dict": self.model},
-                    "checkpoints/best_dev_f1_model_.pt"
+                    "trainings/checkpoints/best_dev_f1_model_.pt"
                 )
 
             dev_f1s.append(dev_f1)

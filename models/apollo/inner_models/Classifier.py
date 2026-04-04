@@ -5,7 +5,6 @@ import torch.nn.functional as F
 
 
 class Classifier(nn.Module):
-
     def __init__(
         self,
         input_dim,

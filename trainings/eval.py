@@ -12,14 +12,14 @@ import torch
 from sklearn import metrics
 from tqdm import tqdm
 
-from Dataset import SAMPLES_PATH
-from Dataset.models.Apollo import Apollo
-from Dataset.models.Dataset import Dataset
-from Dataset.models.constants import DEVICE, DIALOGUES_PER_BATCH, MODALITIES
-from Dataset.utils.constants import DIMS, EMOTION_MAP
-from Dataset.models.functions import batch_to_device
-from Dataset.utils.io_utils import load_pickle
-from Dataset.utils.pause_stats import compute_pause_norm_stats
+from dataset import SAMPLES_PKL
+from dataset.models.Dataset import Dataset
+from dataset.preprocess.utils import utils as dataset_utils
+from dataset.preprocess.utils import constants as dataset_constants
+from models.apollo.utils import constants as arguments_and_constants
+
+from models.apollo.Apollo import Apollo
+from models.apollo.utils.functions import batch_to_device
 
 logging.basicConfig(level=logging.INFO)
 
@@ -93,12 +93,12 @@ def _load_checkpoint_weights(model: Apollo, path: Path, map_location) -> dict:
 
 
 def main():
-    ckpt = torch.load(Path("checkpoints/model.pt"), map_location=DEVICE, weights_only=False)
+    ckpt = torch.load("trainings/checkpoints/model.pt", map_location=arguments_and_constants.DEVICE, weights_only=False)
     cw = ckpt.get("class_weights")
     if cw is not None:
-        cw = cw.to(DEVICE)
+        cw = cw.to(arguments_and_constants.DEVICE)
 
-    data = load_pickle(Path("Dataset") / SAMPLES_PATH)
+    data = dataset_utils.load_pickle(Path("Dataset") / SAMPLES_PKL)
     samples = data["test"]
 
     s0 = samples[0]
@@ -107,37 +107,37 @@ def main():
     if mu is not None and std is not None:
         pause_mu, pause_std = float(mu), float(std)
     else:
-        pause_mu, pause_std = compute_pause_norm_stats(data["train"])
+        pause_mu, pause_std = dataset_utils.compute_pause_norm_stats(data["train"])
         pause_mu, pause_std = float(pause_mu), float(pause_std)
         logging.warning(
             "В pickle нет pause_norm_mu/std — mu/std по train. "
             "Обновите данные: python Dataset/preprocess.py"
         )
-    dialogues_per_batch = ckpt.get("dialogues_per_batch", DIALOGUES_PER_BATCH)
-    modality_feature_dim = ckpt.get("modality_feature_dim", DIMS[MODALITIES])
+    dialogues_per_batch = ckpt.get("dialogues_per_batch", arguments_and_constants.DIALOGUES_PER_BATCH)
+    modality_feature_dim = ckpt.get("modality_feature_dim", arguments_and_constants.DIMS[arguments_and_constants.MODALITIES])
 
     dataset = Dataset(
         samples,
         dialogues_per_batch=dialogues_per_batch,
-        modalities=MODALITIES,
+        modalities=arguments_and_constants.MODALITIES,
         modality_feature_dim=modality_feature_dim,
         pause_mu=pause_mu,
         pause_std=pause_std,
         augment=False,
     )
 
-    model = Apollo(modalities=MODALITIES, device=DEVICE, class_weights=cw)
-    model.to(DEVICE)
+    model = Apollo(modalities=arguments_and_constants.MODALITIES, device=arguments_and_constants.DEVICE, class_weights=cw)
+    model.to(arguments_and_constants.DEVICE)
 
-    meta = _load_checkpoint_weights(model, Path("checkpoints/model.pt"), map_location=DEVICE)
+    meta = _load_checkpoint_weights(model, Path("trainings/checkpoints/model.pt"), map_location=arguments_and_constants.DEVICE)
     if meta:
         logging.info("Checkpoint metadata: %s", {k: meta[k] for k in list(meta)[:5]})
 
     evaluate_dataset(
         model,
         dataset,
-        DEVICE,
-        EMOTION_MAP,
+        arguments_and_constants.DEVICE,
+        dataset_constants.EMOTION_MAP,
         desc="test",
         print_report=True,
     )

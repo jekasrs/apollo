@@ -207,7 +207,8 @@ marimo/_lsp/
 __marimo__/
 
 .idea
-Dataset/meld
+dataset/meld
 checkpoints/
+dataset/preprocess/samples
 
 .DS_Store

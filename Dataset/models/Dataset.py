@@ -4,8 +4,8 @@ from collections import defaultdict
 
 import torch
 
-from Dataset.models.functions import BATCH_KEY_UTTERANCE_TEXTS
-from Dataset.utils.constants import PAUSE_FEATURE_DIM
+from dataset.preprocess.utils.constants import PAUSE_FEATURE_DIM
+from models.apollo.utils.functions import BATCH_KEY_UTTERANCE_TEXTS
 
 
 def _sample_audio_vec(sample) -> torch.Tensor:

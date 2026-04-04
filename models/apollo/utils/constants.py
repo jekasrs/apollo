@@ -1,5 +1,7 @@
 import torch
 
+from dataset.preprocess.utils.constants import AUDIO_FEATURE_DIM, TEXT_EMBED_DIM
+
 MODALITIES = "at"
 
 SMOKE_TEST = True
@@ -8,7 +10,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 if SMOKE_TEST:
     DIALOGUES_PER_BATCH = 4
-    EPOCHS = 25
+    EPOCHS = 10
     RUN_TEST_EACH_EPOCH = False
 else:
     DIALOGUES_PER_BATCH = 8
@@ -38,3 +40,9 @@ USE_TRAIN_AUGMENTATION = True
 AUG_APPLY_PROB = 0.65
 AUG_AUDIO_STD = 0.028
 AUG_TEXT_STD = 0.028
+
+# RGCN: (время вперёд / назад) × (тот же спикер / другой)
+NUM_SEMANTIC_RELATIONS = 4
+
+# a=768, t=768, at=1536 размер входа для каждой модальности
+DIMS = {"a": AUDIO_FEATURE_DIM, "t": TEXT_EMBED_DIM, "at": TEXT_EMBED_DIM + AUDIO_FEATURE_DIM}

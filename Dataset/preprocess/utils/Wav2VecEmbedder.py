@@ -8,6 +8,8 @@ import numpy as np
 import torch
 from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Model
 
+from dataset.preprocess.utils.constants import SAMPLE_RATE
+
 
 class Wav2VecEmbedder:
     def __init__(self, model_name: str, device: Optional[torch.device] = None):
@@ -25,7 +27,7 @@ class Wav2VecEmbedder:
             return np.zeros((0, self.model.config.hidden_size), dtype=np.float32)
         inputs = self.feature_extractor(
             waveforms,
-            sampling_rate=16000,
+            sampling_rate=SAMPLE_RATE,
             padding=True,
             return_tensors="pt",
         )

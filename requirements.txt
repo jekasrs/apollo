@@ -1,0 +1,9 @@
+librosa
+nltk
+numpy
+pandas
+scikit-learn
+sentence-transformers
+torch
+tqdm
+transformers>=4.36.0

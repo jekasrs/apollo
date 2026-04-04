@@ -1,23 +1,14 @@
 import torch
 from torch import nn
-from Dataset.models.Classifier import Classifier
-from Dataset.models.GNN import GNN
-from Dataset.models.SeqContext import SeqContext
-from Dataset.models.functions import NUM_SEMANTIC_RELATIONS, batch_graphify
-from Dataset.models.constants import (
-    CLASSIFIER_HIDDEN_DIM,
-    DROPOUT_CLASSIFIER,
-    DROPOUT_RNN,
-    FOCAL_GAMMA,
-    GNN_H1_DIM,
-    GNN_H2_DIM,
-    LABEL_SMOOTHING,
-    MODALITY_PROJ_DIM,
-    RNN_HIDDEN_DIM,
-    USE_FOCAL_LOSS,
-    USE_INPUT_LAYER_NORM,
-)
-from Dataset.utils.constants import AUDIO_FEATURE_DIM, DIMS, EMOTION_MAP
+
+from dataset.preprocess.utils import constants as dataset_constants
+from models.apollo.utils.functions import batch_graphify
+from models.apollo.utils.constants import RNN_HIDDEN_DIM, GNN_H1_DIM, GNN_H2_DIM, CLASSIFIER_HIDDEN_DIM, MODALITY_PROJ_DIM, \
+    USE_INPUT_LAYER_NORM, DROPOUT_CLASSIFIER, USE_FOCAL_LOSS, FOCAL_GAMMA, LABEL_SMOOTHING, DROPOUT_RNN, \
+    NUM_SEMANTIC_RELATIONS, DIMS
+from models.apollo.inner_models.Classifier import Classifier
+from models.apollo.inner_models.GNN import GNN
+from models.apollo.inner_models.SeqContext import SeqContext
 
 
 class Apollo(nn.Module):
@@ -37,7 +28,7 @@ class Apollo(nn.Module):
         self.gnn_n_heads = 2
 
         if modalities == "at":
-            self.audio_proj = nn.Linear(AUDIO_FEATURE_DIM, MODALITY_PROJ_DIM)
+            self.audio_proj = nn.Linear(dataset_constants.AUDIO_FEATURE_DIM, MODALITY_PROJ_DIM)
             self.text_proj = nn.Linear(DIMS["t"], MODALITY_PROJ_DIM)
             rnn_content_dim = 2 * MODALITY_PROJ_DIM
         else:
@@ -65,7 +56,7 @@ class Apollo(nn.Module):
         self.classifier = Classifier(
             classifier_input_dim,
             hc_dim,
-            len(EMOTION_MAP),
+            len(dataset_constants.EMOTION_MAP),
             drop_rate=DROPOUT_CLASSIFIER,
             class_weights=class_weights,
             use_focal=USE_FOCAL_LOSS,
@@ -77,8 +68,8 @@ class Apollo(nn.Module):
         pause = x[..., -1:]
         xc = x[..., :-1]
         if self.modalities == "at":
-            audio = xc[..., :AUDIO_FEATURE_DIM]
-            text = xc[..., AUDIO_FEATURE_DIM:]
+            audio = xc[..., :dataset_constants.AUDIO_FEATURE_DIM]
+            text = xc[..., dataset_constants.AUDIO_FEATURE_DIM:]
             xc = torch.cat([self.audio_proj(audio), self.text_proj(text)], dim=-1)
         if self.input_ln is not None:
             xc = self.input_ln(xc)
