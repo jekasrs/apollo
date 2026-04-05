@@ -4,18 +4,11 @@ from dataset.preprocess.utils.constants import AUDIO_FEATURE_DIM, TEXT_EMBED_DIM
 
 MODALITIES = "at"
 
-SMOKE_TEST = True
-
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-if SMOKE_TEST:
-    DIALOGUES_PER_BATCH = 4
-    EPOCHS = 10
-    RUN_TEST_EACH_EPOCH = False
-else:
-    DIALOGUES_PER_BATCH = 8
-    EPOCHS = 60
-    RUN_TEST_EACH_EPOCH = True
+DIALOGUES_PER_BATCH = 8
+EPOCHS = 10
+RUN_TEST_EACH_EPOCH = True
 
 LEARNING_RATE = 2e-4
 MAX_GRAD_VALUE = 1.0

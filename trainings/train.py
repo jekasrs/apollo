@@ -17,18 +17,11 @@ logging.basicConfig(level=logging.INFO)
 
 def main():
     data = dataset_utils.load_pickle(f"{SAMPLES_PKL}")
-    # /Users/evsmirnovalek/PycharmProjects/apollo/dataset/preprocess/samples/samples.pkl
     logging.log(logging.INFO, f"Loaded data set MELD")
 
     train_samples = data["train"]
     dev_samples = data["dev"]
     test_samples = data["test"]
-
-    if arguments_and_constants.SMOKE_TEST:
-        logging.info(
-            "SMOKE_TEST mode: fewer epochs, smaller dialogues_per_batch "
-            "(set SMOKE_TEST=False in Dataset/models/constants.py for full training)"
-        )
 
     s0 = train_samples[0]
     mu = getattr(s0, "pause_norm_mu", None)
