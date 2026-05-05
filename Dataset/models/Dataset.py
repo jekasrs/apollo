@@ -53,7 +53,8 @@ def _group_samples_into_dialogues(samples):
 
 class Dataset:
     """
-    Батчи по диалогам; последний канал входа — нормализованная пауза (log1p + z-score по train).
+    Батчи по диалогам. При ``use_pause=True`` последний канал входа — нормализованная пауза
+    (log1p + z-score по train); при ``False`` подаются только признаки модальностей.
     """
 
     def __init__(
@@ -65,10 +66,14 @@ class Dataset:
         pause_mu: float,
         pause_std: float,
         augment: bool = False,
+        use_pause: bool = True,
     ) -> None:
         self.modalities = modalities
         self.modality_feature_dim = modality_feature_dim
-        self.embedding_dim = modality_feature_dim + PAUSE_FEATURE_DIM
+        self.use_pause = use_pause
+        self.embedding_dim = modality_feature_dim + (
+            PAUSE_FEATURE_DIM if use_pause else 0
+        )
         self.pause_mu = float(pause_mu)
         self.pause_std = float(pause_std) if float(pause_std) > 1e-8 else 1.0
         self.dialogues_per_batch = max(1, int(dialogues_per_batch))
@@ -115,8 +120,11 @@ class Dataset:
                     feat = t
                 else:
                     raise ValueError(f"Unknown modalities: {self.modalities}")
-                p = torch.tensor([self._norm_pause(s)], dtype=torch.float32)
-                full = torch.cat([feat, p])
+                if self.use_pause:
+                    p = torch.tensor([self._norm_pause(s)], dtype=torch.float32)
+                    full = torch.cat([feat, p])
+                else:
+                    full = feat
                 input_tensor[di, j, :] = full
                 speaker_tensor[di, j] = locals_[j]
                 labels.append(s.label)

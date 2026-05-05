@@ -1,21 +1,38 @@
-"""Пулинг эмбеддингов реплики через предобученный Wav2Vec2 (без fine-tune на этапе препроцесса)."""
+"""Пулинг эмбеддингов реплики через Wav2Vec2 (предобученный или дообученный на MELD)."""
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 import numpy as np
 import torch
-from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Model
+from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2ForSequenceClassification, Wav2Vec2Model
 
 from dataset.preprocess.utils.constants import SAMPLE_RATE
 
+log = logging.getLogger(__name__)
+
 
 class Wav2VecEmbedder:
-    def __init__(self, model_name: str, device: Optional[torch.device] = None):
+    def __init__(
+        self,
+        model_name: str,
+        device: Optional[torch.device] = None,
+        finetuned_path: Optional[str] = None,
+    ):
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_name)
-        self.model = Wav2Vec2Model.from_pretrained(model_name).to(self.device).eval()
+        if finetuned_path:
+            log.info("Аудио-эмбеддер: веса из дообучения %s (backbone wav2vec2)", finetuned_path)
+            cls = Wav2Vec2ForSequenceClassification.from_pretrained(finetuned_path)
+            self.model = cls.wav2vec2.to(self.device).eval()
+            try:
+                self.feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(finetuned_path)
+            except OSError:
+                self.feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_name)
+        else:
+            self.feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_name)
+            self.model = Wav2Vec2Model.from_pretrained(model_name).to(self.device).eval()
 
     @torch.inference_mode()
     def encode_batch(self, waveforms: list[np.ndarray]) -> np.ndarray:

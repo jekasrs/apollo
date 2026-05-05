@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Eleos</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <main>
+    <h1>Eleos</h1>
+    <div id="statusBar" class="status-pill status-bad">Проверка сервера…</div>
+    <div class="grid">
+      <div class="panel">
+        <h2>Чат</h2>
+        <div class="row">
+          <div>
+            <label for="numSp">Число участников (N)</label>
+            <input id="numSp" type="number" min="1" max="32" value="3" />
+          </div>
+          <button type="button" class="btn-ghost" id="btnNew">Новый чат</button>
+        </div>
+        <h2 style="font-size:0.88rem; margin:0.5rem 0 0.35rem">Реплики</h2>
+        <div id="messages" class="messages" aria-live="polite"></div>
+        <div class="row" style="margin-top:0.75rem; align-items:stretch">
+          <div style="flex:1; min-width: 180px">
+            <label for="inputText">Текст</label>
+            <textarea id="inputText" placeholder="Реплика…"></textarea>
+          </div>
+          <div>
+            <label for="selSpeaker">Кто пишет (0…N−1)</label>
+            <select id="selSpeaker"></select>
+          </div>
+          <div style="align-self:flex-end">
+            <button type="button" class="btn-primary" id="btnAdd">Добавить</button>
+          </div>
+        </div>
+        <div class="row" style="margin-top:0.5rem">
+          <button type="button" class="btn-primary" id="btnAnalyze">Отправить на анализ</button>
+        </div>
+        <p id="err" class="sub" style="color:#f87171; margin:0.5rem 0 0"></p>
+        <div class="result-wrap hidden" id="resultBlock">
+          <h2>Результат</h2>
+          <p class="sub" id="resHint" style="margin:0 0 0.5rem"></p>
+          <div class="graph-wrap" id="graphWrap">
+            <svg id="diag-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Граф реплик"></svg>
+          </div>
+          <div id="speakerStats" class="speaker-stats-wrap" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>JSON</h2>
+        <p class="sub" style="margin:0 0 0.5rem">Импорт / экспорт (<code>eleos-dialogue-v1</code>)</p>
+        <div class="file-row" style="margin-bottom:0.5rem">
+          <input type="file" id="fileIn" accept=".json,application/json" />
+        </div>
+        <button type="button" class="btn-ghost" id="btnExport">Скачать dialogue.json</button>
+        <div class="footer-json">
+          <label class="sub">Текущий JSON</label>
+          <div class="json-block" id="jsonPreview"></div>
+        </div>
+        <h2 style="margin-top:1.25rem">Эмоции (легенда)</h2>
+        <p class="sub" style="margin:0 0 0.5rem; font-size:0.82rem">Цвет узла = предсказанная эмоция реплики. Цифра под точкой = спикер, цвет цифры — тот же для всех реплик данного спикера.</p>
+        <div id="legendTable"></div>
+      </div>
+    </div>
+  </main>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

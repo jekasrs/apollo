@@ -1,0 +1,9 @@
+{
+  "modalities": "a",
+  "input_shape": [
+    768,
+    1
+  ],
+  "feature_name": "meld",
+  "samples_pkl": "/Users/evsmirnovalek/PycharmProjects/apollo/dataset/preprocess/samples/samples.pkl"
+}

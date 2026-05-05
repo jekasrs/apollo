@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import torch
 from torch import nn
 
@@ -12,9 +14,19 @@ from models.apollo.inner_models.SeqContext import SeqContext
 
 
 class Apollo(nn.Module):
-    def __init__(self, modalities, device, class_weights=None):
+    def __init__(
+        self,
+        modalities,
+        device,
+        class_weights=None,
+        use_pause: bool = True,
+        focal_gamma: float | None = None,
+        use_focal: bool | None = None,
+        label_smoothing: float | None = None,
+    ):
         super(Apollo, self).__init__()
         self.modalities = modalities
+        self.use_pause = use_pause
         u_dim = DIMS[modalities]
         g_dim = RNN_HIDDEN_DIM
         h1_dim = GNN_H1_DIM
@@ -37,7 +49,7 @@ class Apollo(nn.Module):
             rnn_content_dim = u_dim
 
         self.input_ln = nn.LayerNorm(rnn_content_dim) if USE_INPUT_LAYER_NORM else None
-        rnn_in_dim = rnn_content_dim + 1
+        rnn_in_dim = rnn_content_dim + (1 if use_pause else 0)
 
         self.rnn = SeqContext(
             dataset_embedding_dims=rnn_in_dim,
@@ -53,27 +65,40 @@ class Apollo(nn.Module):
         else:
             classifier_input_dim = h2_dim * self.gnn_n_heads
 
+        fg = FOCAL_GAMMA if focal_gamma is None else focal_gamma
+        use_f = USE_FOCAL_LOSS if use_focal is None else use_focal
+        ls = (
+            0.0
+            if use_f
+            else (LABEL_SMOOTHING if label_smoothing is None else float(label_smoothing))
+        )
         self.classifier = Classifier(
             classifier_input_dim,
             hc_dim,
             len(dataset_constants.EMOTION_MAP),
             drop_rate=DROPOUT_CLASSIFIER,
             class_weights=class_weights,
-            use_focal=USE_FOCAL_LOSS,
-            focal_gamma=FOCAL_GAMMA,
-            label_smoothing=0.0 if USE_FOCAL_LOSS else LABEL_SMOOTHING,
+            use_focal=use_f,
+            focal_gamma=fg,
+            label_smoothing=ls,
         )
 
     def _prepare_input_tensor(self, x):
-        pause = x[..., -1:]
-        xc = x[..., :-1]
+        if self.use_pause:
+            pause = x[..., -1:]
+            xc = x[..., :-1]
+        else:
+            pause = None
+            xc = x
         if self.modalities == "at":
             audio = xc[..., :dataset_constants.AUDIO_FEATURE_DIM]
             text = xc[..., dataset_constants.AUDIO_FEATURE_DIM:]
             xc = torch.cat([self.audio_proj(audio), self.text_proj(text)], dim=-1)
         if self.input_ln is not None:
             xc = self.input_ln(xc)
-        return torch.cat([xc, pause], dim=-1)
+        if self.use_pause:
+            return torch.cat([xc, pause], dim=-1)
+        return xc
 
     def _encode_dialogues(self, data):
         inp = self._prepare_input_tensor(data["input_tensor"])

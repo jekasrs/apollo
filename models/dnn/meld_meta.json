@@ -1,0 +1,6 @@
+{
+  "modalities": "t",
+  "feature_dim": 768,
+  "feature_name": "meld",
+  "samples_pkl": "/Users/evsmirnovalek/PycharmProjects/apollo/dataset/preprocess/samples/samples.pkl"
+}

@@ -208,6 +208,13 @@ __marimo__/
 
 .idea
 dataset/meld
+
+# Артефакты results/, кроме README и сводной таблицы
+/results/**
+!/results/README.md
+!/results/RESULTS.md
+
+# Легаси-путь после реорганизации
 checkpoints/
 dataset/preprocess/samples
 
