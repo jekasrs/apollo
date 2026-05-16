@@ -1,6 +1,8 @@
+gensim>=4.3.0
 librosa
 nltk
 numpy
+matplotlib>=3.7.0
 pandas
 scikit-learn
 sentence-transformers
